@@ -1,0 +1,25 @@
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 16px 0;
+}
+
+.search {
+  flex: 1;
+}
+
+.trips-table {
+  width: 100%;
+  overflow: auto;
+}
+
+.error {
+  color: #b00020;
+  margin: 12px 0;
+}
+
+.empty {
+  color: #667085;
+  padding: 16px 0;
+}

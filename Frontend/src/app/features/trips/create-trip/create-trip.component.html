@@ -1,0 +1,67 @@
+<form class="form" [formGroup]="form" (ngSubmit)="submit()">
+  <mat-form-field appearance="outline">
+    <mat-label>Cargo ID</mat-label>
+    <input matInput formControlName="cargoId" />
+    @if (form.controls.cargoId.hasError('required')) {
+      <mat-error>Cargo ID is required.</mat-error>
+    }
+  </mat-form-field>
+
+  <mat-form-field appearance="outline">
+    <mat-label>Vehicle ID</mat-label>
+    <input matInput formControlName="vehicleId" />
+    @if (form.controls.vehicleId.hasError('required')) {
+      <mat-error>Vehicle ID is required.</mat-error>
+    }
+    @if (form.controls.vehicleId.hasError('vehicleUnavailable')) {
+      <mat-error>{{ form.controls.vehicleId.getError('vehicleUnavailable') }}</mat-error>
+    }
+  </mat-form-field>
+
+  <mat-form-field appearance="outline">
+    <mat-label>Driver ID</mat-label>
+    <input matInput formControlName="driverId" />
+    @if (form.controls.driverId.hasError('required')) {
+      <mat-error>Driver ID is required.</mat-error>
+    }
+  </mat-form-field>
+
+  <mat-form-field appearance="outline">
+    <mat-label>Origin</mat-label>
+    <input matInput formControlName="origin" />
+    @if (form.controls.origin.hasError('required')) {
+      <mat-error>Origin is required.</mat-error>
+    }
+  </mat-form-field>
+
+  <mat-form-field appearance="outline">
+    <mat-label>Destination</mat-label>
+    <input matInput formControlName="destination" />
+    @if (form.controls.destination.hasError('required')) {
+      <mat-error>Destination is required.</mat-error>
+    }
+  </mat-form-field>
+
+  <mat-form-field appearance="outline">
+    <mat-label>Scheduled start</mat-label>
+    <input matInput type="datetime-local" formControlName="scheduledStart" />
+    @if (form.controls.scheduledStart.hasError('required')) {
+      <mat-error>Scheduled start is required.</mat-error>
+    }
+  </mat-form-field>
+
+  <mat-form-field appearance="outline">
+    <mat-label>Scheduled end</mat-label>
+    <input matInput type="datetime-local" formControlName="scheduledEnd" />
+    @if (form.controls.scheduledEnd.hasError('required')) {
+      <mat-error>Scheduled end is required.</mat-error>
+    }
+  </mat-form-field>
+
+  <button mat-flat-button color="primary" type="submit" [disabled]="form.pending || api.loading()">
+    @if (form.pending || api.loading()) {
+      <mat-spinner diameter="18" />
+    }
+    Create trip
+  </button>
+</form>
