@@ -1,61 +1,126 @@
-<div class="toolbar">
-  <mat-form-field appearance="outline" class="search">
-    <mat-label>Search trips</mat-label>
-    <input matInput [formControl]="searchControl" placeholder="Warsaw, Volvo, driver..." />
-    <mat-icon matSuffix>search</mat-icon>
-  </mat-form-field>
+<section class="trip-list">
+  <div class="trip-list__header">
+    <mat-form-field appearance="outline" class="trip-list__search">
+      <mat-label>Search trips</mat-label>
+      <input
+        matInput
+        type="text"
+        [formControl]="searchControl"
+        placeholder="Route, cargo, vehicle or driver"
+      />
+      <mat-icon matSuffix>search</mat-icon>
+    </mat-form-field>
 
-  <button mat-stroked-button type="button" (click)="refresh()">
-    <mat-icon>refresh</mat-icon>
-    Refresh
-  </button>
-</div>
+    <button
+      mat-stroked-button
+      type="button"
+      (click)="refresh()"
+      [disabled]="api.loading()"
+    >
+      <mat-icon>refresh</mat-icon>
+      Refresh
+    </button>
+  </div>
 
-@if (api.loading()) {
-  <mat-progress-bar mode="indeterminate" />
-}
+  @if (api.loading()) {
+    <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+  }
 
-@if (api.error()) {
-  <p class="error">{{ api.error() }}</p>
-}
+  @if (api.error()) {
+    <div class="trip-list__error">
+      {{ api.error() }}
+    </div>
+  }
 
-<table mat-table [dataSource]="api.activeTrips()" class="trips-table">
-  <ng-container matColumnDef="route">
-    <th mat-header-cell *matHeaderCellDef>Route</th>
-    <td mat-cell *matCellDef="let trip">{{ trip.origin }} → {{ trip.destination }}</td>
-  </ng-container>
+  <div class="trip-list__table-wrapper">
+    <table
+      mat-table
+      [dataSource]="api.activeTrips()"
+      class="trip-list__table"
+    >
+      <ng-container matColumnDef="route">
+        <th mat-header-cell *matHeaderCellDef>Route</th>
+        <td mat-cell *matCellDef="let trip">
+          <strong>{{ trip.origin }}</strong>
+          <span class="trip-list__route-arrow">→</span>
+          <strong>{{ trip.destination }}</strong>
+        </td>
+      </ng-container>
 
-  <ng-container matColumnDef="cargo">
-    <th mat-header-cell *matHeaderCellDef>Cargo</th>
-    <td mat-cell *matCellDef="let trip">{{ trip.cargoDescription }} / {{ trip.cargoWeightKg }} kg</td>
-  </ng-container>
+      <ng-container matColumnDef="cargo">
+        <th mat-header-cell *matHeaderCellDef>Cargo</th>
+        <td mat-cell *matCellDef="let trip">
+          <div>{{ trip.cargoDescription }}</div>
+          <small>{{ trip.cargoWeightKg }} kg</small>
+        </td>
+      </ng-container>
 
-  <ng-container matColumnDef="vehicle">
-    <th mat-header-cell *matHeaderCellDef>Vehicle</th>
-    <td mat-cell *matCellDef="let trip">{{ trip.vehiclePlateNumber }}</td>
-  </ng-container>
+      <ng-container matColumnDef="vehicle">
+        <th mat-header-cell *matHeaderCellDef>Vehicle</th>
+        <td mat-cell *matCellDef="let trip">
+          {{ trip.vehiclePlateNumber }}
+        </td>
+      </ng-container>
 
-  <ng-container matColumnDef="driver">
-    <th mat-header-cell *matHeaderCellDef>Driver</th>
-    <td mat-cell *matCellDef="let trip">{{ trip.driverFullName }}</td>
-  </ng-container>
+      <ng-container matColumnDef="driver">
+        <th mat-header-cell *matHeaderCellDef>Driver</th>
+        <td mat-cell *matCellDef="let trip">
+          {{ trip.driverFullName }}
+        </td>
+      </ng-container>
 
-  <ng-container matColumnDef="window">
-    <th mat-header-cell *matHeaderCellDef>Window</th>
-    <td mat-cell *matCellDef="let trip">
-      {{ trip.scheduledStart | date: 'short' }} — {{ trip.scheduledEnd | date: 'short' }}
-    </td>
-  </ng-container>
+      <ng-container matColumnDef="window">
+        <th mat-header-cell *matHeaderCellDef>Window</th>
+        <td mat-cell *matCellDef="let trip">
+          <div>{{ trip.scheduledStart | date: 'short' }}</div>
+          <small>{{ trip.scheduledEnd | date: 'short' }}</small>
+        </td>
+      </ng-container>
 
-  <ng-container matColumnDef="status">
-    <th mat-header-cell *matHeaderCellDef>Status</th>
-    <td mat-cell *matCellDef="let trip">{{ trip.status }}</td>
-  </ng-container>
+      <ng-container matColumnDef="status">
+        <th mat-header-cell *matHeaderCellDef>Status</th>
+        <td mat-cell *matCellDef="let trip">
+          <span class="trip-list__status">
+            {{ trip.status }}
+          </span>
+        </td>
+      </ng-container>
 
-  <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-  <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
-</table>
+      <ng-container matColumnDef="actions">
+        <th mat-header-cell *matHeaderCellDef>Actions</th>
+        <td mat-cell *matCellDef="let trip">
+          <div class="trip-list__actions">
+            <button
+              mat-flat-button
+              color="primary"
+              type="button"
+              (click)="completeTrip(trip)"
+              [disabled]="isActionLoading(trip)"
+            >
+              Complete
+            </button>
 
-@if (!api.loading() && api.activeTrips().length === 0) {
-  <p class="empty">No active trips found.</p>
-}
+            <button
+              mat-stroked-button
+              color="warn"
+              type="button"
+              (click)="cancelTrip(trip)"
+              [disabled]="isActionLoading(trip)"
+            >
+              Cancel
+            </button>
+          </div>
+        </td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+    </table>
+  </div>
+
+  @if (!api.loading() && api.activeTrips().length === 0) {
+    <div class="trip-list__empty">
+      No active trips found.
+    </div>
+  }
+</section>

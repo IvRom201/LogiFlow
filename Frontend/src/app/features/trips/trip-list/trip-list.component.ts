@@ -7,8 +7,17 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
-import { debounceTime, distinctUntilChanged, startWith, switchMap } from 'rxjs';
+import {
+  EMPTY,
+  catchError,
+  debounceTime,
+  distinctUntilChanged,
+  startWith,
+  switchMap
+} from 'rxjs';
+import { TripResponse } from '../../../core/models/logiflow.models';
 import { LogiFlowApiService } from '../../../core/services/logiflow-api.service';
 
 @Component({
@@ -21,6 +30,7 @@ import { LogiFlowApiService } from '../../../core/services/logiflow-api.service'
     MatIconModule,
     MatInputModule,
     MatProgressBarModule,
+    MatSnackBarModule,
     MatTableModule,
     DatePipe
   ],
@@ -30,8 +40,20 @@ import { LogiFlowApiService } from '../../../core/services/logiflow-api.service'
 })
 export class TripListComponent {
   readonly api = inject(LogiFlowApiService);
+
+  private readonly snackBar = inject(MatSnackBar);
+
   readonly searchControl = new FormControl('', { nonNullable: true });
-  readonly displayedColumns: readonly string[] = ['route', 'cargo', 'vehicle', 'driver', 'window', 'status'];
+
+  readonly displayedColumns: readonly string[] = [
+    'route',
+    'cargo',
+    'vehicle',
+    'driver',
+    'window',
+    'status',
+    'actions'
+  ];
 
   constructor() {
     this.searchControl.valueChanges
@@ -41,7 +63,10 @@ export class TripListComponent {
         distinctUntilChanged(),
         switchMap((value) => {
           this.api.setSearch(value);
-          return this.api.loadActiveTrips(value);
+
+          return this.api.loadActiveTrips(value).pipe(
+            catchError(() => EMPTY)
+          );
         }),
         takeUntilDestroyed()
       )
@@ -49,6 +74,48 @@ export class TripListComponent {
   }
 
   refresh(): void {
-    this.api.loadActiveTrips().subscribe();
+    this.api.loadActiveTrips().subscribe({
+      error: (error: Error) => this.showError(error.message)
+    });
+  }
+
+  completeTrip(trip: TripResponse): void {
+    this.api.completeTrip(trip.id).subscribe({
+      next: () => {
+        this.snackBar.open('Trip completed successfully.', 'Close', {
+          duration: 3000
+        });
+      },
+      error: (error: Error) => this.showError(error.message)
+    });
+  }
+
+  cancelTrip(trip: TripResponse): void {
+    const confirmed = window.confirm(
+      `Cancel trip from ${trip.origin} to ${trip.destination}?`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    this.api.cancelTrip(trip.id).subscribe({
+      next: () => {
+        this.snackBar.open('Trip cancelled successfully.', 'Close', {
+          duration: 3000
+        });
+      },
+      error: (error: Error) => this.showError(error.message)
+    });
+  }
+
+  isActionLoading(trip: TripResponse): boolean {
+    return this.api.actionLoadingId() === trip.id;
+  }
+
+  private showError(message: string): void {
+    this.snackBar.open(message, 'Close', {
+      duration: 5000
+    });
   }
 }
