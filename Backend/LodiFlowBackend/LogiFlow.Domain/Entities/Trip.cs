@@ -106,6 +106,11 @@ public sealed class Trip : Entity
             throw new DomainRuleException("Completed trip cannot be cancelled.");
         }
 
+        if (Status == TripStatus.Cancelled)
+        {
+            throw new DomainRuleException("Cancelled trip cannot be cancelled again.");
+        }
+
         Status = TripStatus.Cancelled;
     }
 }

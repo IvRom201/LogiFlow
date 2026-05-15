@@ -12,7 +12,19 @@ internal sealed class EfTripRepository(AppDbContext context) : ITripRepository
         await context.Trips.AddAsync(trip, cancellationToken);
     }
 
-    public async Task<IReadOnlyList<Trip>> GetActiveAsync(string? search, CancellationToken cancellationToken)
+    public async Task<Trip?> GetByIdForUpdateAsync(Guid id, CancellationToken cancellationToken)
+    {
+        return await context.Trips
+            .FromSqlInterpolated($"""
+                                  SELECT *
+                                  FROM trips
+                                  WHERE id = {id}
+                                  FOR UPDATE
+                                  """)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task<List<Trip>> GetActiveAsync(string? search, CancellationToken cancellationToken)
     {
         var query = context.Trips
             .AsNoTracking()
@@ -24,6 +36,7 @@ internal sealed class EfTripRepository(AppDbContext context) : ITripRepository
         if (!string.IsNullOrWhiteSpace(search))
         {
             var pattern = $"%{search.Trim()}%";
+
             query = query.Where(trip =>
                 EF.Functions.ILike(trip.Origin, pattern) ||
                 EF.Functions.ILike(trip.Destination, pattern) ||

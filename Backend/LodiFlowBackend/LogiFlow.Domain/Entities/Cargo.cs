@@ -72,4 +72,14 @@ public sealed class Cargo : Entity
 
         Status = CargoStatus.Delivered;
     }
+    
+    public void Cancel()
+    {
+        if (Status is not CargoStatus.Assigned and not CargoStatus.InTransit)
+        {
+            throw new DomainRuleException($"Cargo cannot be cancelled while status is {Status}.");
+        }
+
+        Status = CargoStatus.Cancelled;
+    }
 }

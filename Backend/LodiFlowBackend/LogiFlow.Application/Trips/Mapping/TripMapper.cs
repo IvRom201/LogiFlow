@@ -21,4 +21,21 @@ internal static class TripMapper
         ScheduledEnd = trip.ScheduledEnd,
         Status = trip.Status.ToString()
     };
+
+    internal static TripResponse ToResponse(Trip trip, Cargo cargo, Vehicle vehicle, Driver driver) => new()
+    {
+        Id = trip.Id,
+        CargoId = cargo.Id,
+        CargoDescription = cargo.Description,
+        CargoWeightKg = cargo.WeightKg,
+        VehicleId = vehicle.Id,
+        VehiclePlateNumber = vehicle.PlateNumber,
+        DriverId = driver.Id,
+        DriverFullName = driver.FullName,
+        Origin = trip.Origin,
+        Destination = trip.Destination,
+        ScheduledStart = trip.ScheduledStart,
+        ScheduledEnd = trip.ScheduledEnd,
+        Status = trip.Status.ToString()
+    };
 }

@@ -5,5 +5,8 @@ namespace LogiFlow.Application.Abstractions.Repositories;
 public interface ITripRepository
 {
     Task AddAsync(Trip trip, CancellationToken cancellationToken);
-    Task<IReadOnlyList<Trip>> GetActiveAsync(string? search, CancellationToken cancellationToken);
+
+    Task<Trip?> GetByIdForUpdateAsync(Guid id, CancellationToken cancellationToken);
+
+    Task<List<Trip>> GetActiveAsync(string? search, CancellationToken cancellationToken);
 }
