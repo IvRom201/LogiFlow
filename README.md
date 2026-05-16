@@ -1,195 +1,335 @@
 # LogiFlow
 
-LogiFlow is a logistics management MVP built with \*\*.NET 9\*\*, \*\*Angular 18\*\*, \*\*PostgreSQL\*\*, and \*\*Docker\*\*.
+LogiFlow is a fullstack logistics management MVP built with **.NET 9**, **Angular 18**, **PostgreSQL**, and **Docker**.
 
-The application allows users to view active trips and create new trips by assigning available vehicles and drivers to cargo.
+The system allows a dispatcher to sign in, view active logistics trips, create new trips, and manage the trip lifecycle by completing or cancelling active trips.
 
+The main backend use case is not a simple CRUD operation. Creating a trip validates and updates several related resources in one transaction:
 
-
-## Tech Stack
-
-
-### Backend
-
-
-
-- .NET 9 Web API
-
-- Clean Architecture
-
-- MediatR
-
-- Entity Framework Core
-
-- PostgreSQL
-
-- Fluent API entity configuration
-
-- Swagger / OpenAPI
-
-- JWT Bearer authentication configuration
-
-
-
-### Frontend
-
-
-
-- Angular 18
-
-- Standalone Components
-
-- Angular Signals
-
-- RxJS
-
-- Angular Material
-
-- Functional HTTP Interceptors
-
-
-
-### DevOps
-
-
-
-- Docker
-
-- Docker Compose
-
-- PostgreSQL container
-
-- Nginx for Angular production hosting
-
-
+- cargo must be assignable;
+- vehicle must be idle and have enough capacity;
+- driver must be available;
+- trip is created;
+- cargo, vehicle and driver statuses are updated consistently.
 
 ---
 
+## Tech Stack
 
+### Backend
+
+- .NET 9 Web API
+- Minimal APIs with `MapGroup`
+- Clean Architecture
+- MediatR
+- Entity Framework Core
+- PostgreSQL
+- EF Core Migrations
+- Fluent API entity configuration
+- Repository abstractions
+- Unit of Work
+- Explicit transaction handling
+- JWT Bearer authentication
+- Swagger / OpenAPI
+- Global exception handling
+- xUnit, Moq, FluentAssertions
+
+### Frontend
+
+- Angular 18
+- Standalone Components
+- Angular Signals
+- RxJS
+- Angular Material
+- Reactive Forms
+- Functional HTTP Interceptors
+- JWT-based login flow
+- Protected routes with route guard
+
+### DevOps
+
+- Docker
+- Docker Compose
+- PostgreSQL container
+- Nginx for Angular production hosting
+- GitHub Actions CI
+
+---
 
 ## Project Structure
 
-
+```text
 LogiFlow/
-
 ├── Backend/
-
 │   └── LodiFlowBackend/
-
 │       ├── LogiFlow.Domain/
-
 │       ├── LogiFlow.Application/
-
 │       ├── LogiFlow.Infrastructure/
-
 │       ├── LogiFlow.WebApi/
-
-│       ├── Dockerfile
-
-│       └── .dockerignore
-
+│       ├── LogiFlow.Domain.Tests/
+│       ├── LogiFlow.Application.Tests/
+│       └── LodiFlowBackend.sln
 │
-
 ├── Frontend/
-
 │   ├── src/
-
 │   ├── Dockerfile
-
 │   ├── nginx.conf
-
-│   ├── proxy.conf.json
-
-│   └── .dockerignore
-
+│   └── proxy.conf.json
 │
-
+├── .github/
+│   └── workflows/
+│       └── ci.yml
+│
 ├── docker-compose.yml
-
 └── README.md
-
-
 
 ## Architecture
 
 The backend follows Clean Architecture principles.
 
+```text
+WebApi
+  ↓
+Application
+  ↓
+Domain
+```
+
+Infrastructure implements Application abstractions.
+
+---
+
 ### Domain Layer
 
-Contains core business entities and enums:
+Contains the core business model:
 
 - `Cargo`
 - `Vehicle`
 - `Driver`
 - `Trip`
+
+And status enums:
+
+- `CargoStatus`
 - `VehicleStatus`
 - `DriverStatus`
-- `CargoStatus`
 - `TripStatus`
+
+The domain entities contain business rules and state transitions.
+
+Examples:
+
+- cargo can be assigned only when it is pending;
+- vehicle can be assigned only when it is idle and has enough capacity;
+- driver can be assigned only when available;
+- completed trips cannot be cancelled;
+- cancelled trips cannot be completed.
+
+---
 
 ### Application Layer
 
-Contains application logic:
-
-- DTOs
-- MediatR commands and queries
-- Repository abstractions
-- Unit of Work abstraction
-- Transaction abstraction
-
-Main use case:
+Contains use cases implemented with MediatR:
 
 - `CreateTripCommand`
+- `CompleteTripCommand`
+- `CancelTripCommand`
+- `GetActiveTripsQuery`
 
-It validates that:
+It also contains:
 
-- Cargo exists and is pending
-- Vehicle exists and is idle
-- Driver exists and is available
+- DTOs;
+- repository interfaces;
+- Unit of Work abstraction;
+- transaction abstraction;
+- application-level exceptions.
 
-Then it creates a trip and updates statuses inside one database transaction.
+---
 
 ### Infrastructure Layer
 
-Contains:
+Contains technical implementations:
 
-- EF Core `DbContext`
-- PostgreSQL configuration
-- Entity configurations via Fluent API
-- Repository implementations
-- Database seeding
-- Transaction implementation
+- EF Core `AppDbContext`;
+- PostgreSQL configuration;
+- Fluent API entity configurations;
+- repository implementations;
+- EF Core migrations;
+- database seeding;
+- transaction implementation.
+
+---
 
 ### WebApi Layer
 
 Contains:
 
-- Minimal API endpoints with `MapGroup`
-- Swagger configuration
-- JWT Bearer security definition
-- Global exception handling
+- Minimal API endpoints;
+- Swagger configuration;
+- JWT Bearer authentication;
+- demo authentication endpoints;
+- global exception handling;
+- CORS configuration for Angular frontend.
 
 ---
 
-## Backend API
+## Main Business Flow
 
-### Trips
-
-#### Get Active Trips
-
-```http
-GET /api/trips/active
-```
-
-Returns active trips.
-
-#### Create Trip
+### Creating a Trip
 
 ```http
 POST /api/trips
 ```
 
-Creates a new trip.
+```text
+POST /api/trips
+        ↓
+CreateTripCommand
+        ↓
+CreateTripCommandHandler
+        ↓
+Begin database transaction
+        ↓
+Lock cargo FOR UPDATE
+Lock vehicle FOR UPDATE
+Lock driver FOR UPDATE
+        ↓
+Validate cargo / vehicle / driver availability
+        ↓
+Create Trip
+        ↓
+Update statuses:
+- cargo -> Assigned
+- vehicle -> Busy
+- driver -> OnTrip
+        ↓
+SaveChanges
+        ↓
+Commit transaction
+```
+
+This prevents assigning the same vehicle, driver or cargo to multiple trips at the same time.
+
+---
+
+### Completing a Trip
+
+```http
+PUT /api/trips/{id}/complete
+```
+
+```text
+PUT /api/trips/{id}/complete
+        ↓
+CompleteTripCommand
+        ↓
+CompleteTripCommandHandler
+        ↓
+Update statuses:
+- trip -> Completed
+- cargo -> Delivered
+- vehicle -> Idle
+- driver -> Available
+```
+
+---
+
+### Cancelling a Trip
+
+```http
+PUT /api/trips/{id}/cancel
+```
+
+```text
+PUT /api/trips/{id}/cancel
+        ↓
+CancelTripCommand
+        ↓
+CancelTripCommandHandler
+        ↓
+Update statuses:
+- trip -> Cancelled
+- cargo -> Cancelled
+- vehicle -> Idle
+- driver -> Available
+```
+
+---
+
+## Backend API
+
+Most business endpoints require JWT authentication.
+
+---
+
+## Auth
+
+### Login
+
+```http
+POST /api/auth/login
+```
+
+Example request:
+
+```json
+{
+  "email": "dispatcher@logiflow.local",
+  "password": "Dispatcher123!"
+}
+```
+
+Example response:
+
+```json
+{
+  "accessToken": "jwt-token",
+  "email": "dispatcher@logiflow.local",
+  "fullName": "Demo Dispatcher",
+  "role": "Dispatcher",
+  "expiresAt": "2026-05-15T12:00:00Z"
+}
+```
+
+---
+
+### Get Current User
+
+```http
+GET /api/auth/me
+```
+
+Requires authorization.
+
+---
+
+## Trips
+
+All trip endpoints require authorization.
+
+---
+
+### Get Active Trips
+
+```http
+GET /api/trips/active
+```
+
+Optional query parameter:
+
+```http
+GET /api/trips/active?search=warsaw
+```
+
+Returns active trips. Search can match route, cargo, vehicle or driver data.
+
+---
+
+### Create Trip
+
+```http
+POST /api/trips
+```
 
 Example request:
 
@@ -200,20 +340,80 @@ Example request:
   "driverId": "00000000-0000-0000-0000-000000000000",
   "origin": "Warsaw",
   "destination": "Berlin",
-  "scheduledStartUtc": "2026-05-14T10:00:00Z",
-  "scheduledEndUtc": "2026-05-14T18:00:00Z"
+  "scheduledStart": "2026-05-14T10:00:00Z",
+  "scheduledEnd": "2026-05-14T18:00:00Z"
 }
 ```
 
-### Vehicles
+Possible responses:
 
-#### Check Vehicle Availability
+- `201 Created`
+- `400 Bad Request`
+- `404 Not Found`
+- `409 Conflict`
+
+---
+
+### Complete Trip
+
+```http
+PUT /api/trips/{id}/complete
+```
+
+Completes an active trip and releases assigned resources.
+
+Possible responses:
+
+- `200 OK`
+- `404 Not Found`
+- `409 Conflict`
+
+---
+
+### Cancel Trip
+
+```http
+PUT /api/trips/{id}/cancel
+```
+
+Cancels an active trip and releases assigned resources.
+
+Possible responses:
+
+- `200 OK`
+- `404 Not Found`
+- `409 Conflict`
+
+---
+
+## Vehicles
+
+Vehicle endpoints require authorization.
+
+---
+
+### Check Vehicle Availability
 
 ```http
 GET /api/vehicles/{id}/availability
 ```
 
-Checks whether a vehicle is available.
+Checks whether a vehicle is currently available.
+
+---
+
+## Demo Authentication
+
+The project uses a simple demo authentication flow.
+
+Demo users are configured through application settings:
+
+```text
+dispatcher@logiflow.local / Dispatcher123!
+admin@logiflow.local / Admin123!
+```
+
+This is intentionally lightweight and suitable for a portfolio MVP. It is not a production identity system. A production version should use hashed passwords, persistent users, refresh tokens and stricter secret management.
 
 ---
 
@@ -223,7 +423,7 @@ Checks whether a vehicle is available.
 
 - .NET 9 SDK
 - Node.js 20+
-- Angular CLI 18
+- Angular CLI 18+
 - Docker Desktop
 - PostgreSQL via Docker
 
@@ -252,23 +452,17 @@ PostgreSQL connection:
 
 ## Run Backend Locally
 
-Open this solution in Rider:
+Open the solution:
 
 ```text
 Backend/LodiFlowBackend/LodiFlowBackend.sln
 ```
 
-Run the following project:
-
-```text
-LogiFlow.WebApi
-```
-
-Or run it from terminal:
+Or run from terminal:
 
 ```powershell
 cd C:\Studies\Pet_projects\LogiFlow\Backend\LodiFlowBackend
-dotnet run --project LogiFlow.WebApi\LogiFlow.WebApi.csproj
+dotnet run --project LogiFlow.WebApi
 ```
 
 Swagger will be available at the URL printed in the console, for example:
@@ -276,6 +470,55 @@ Swagger will be available at the URL printed in the console, for example:
 ```text
 http://localhost:5081/swagger
 ```
+
+Before starting the backend, PostgreSQL must be running because the application applies migrations on startup.
+
+---
+
+## Database Migrations
+
+Create a new migration:
+
+```powershell
+cd C:\Studies\Pet_projects\LogiFlow\Backend\LodiFlowBackend
+
+dotnet ef migrations add MigrationName `
+  --project LogiFlow.Infrastructure `
+  --startup-project LogiFlow.WebApi `
+  --context AppDbContext `
+  --output-dir Persistence\Migrations
+```
+
+Apply migrations manually:
+
+```powershell
+dotnet ef database update `
+  --project LogiFlow.Infrastructure `
+  --startup-project LogiFlow.WebApi `
+  --context AppDbContext
+```
+
+The application also applies pending migrations automatically on startup.
+
+---
+
+## Run Backend Tests
+
+From the backend solution folder:
+
+```powershell
+cd C:\Studies\Pet_projects\LogiFlow\Backend\LodiFlowBackend
+dotnet test
+```
+
+The backend test projects cover:
+
+- domain entity rules;
+- state transitions;
+- trip creation flow;
+- trip completion flow;
+- trip cancellation flow;
+- transaction commit / rollback behavior.
 
 ---
 
@@ -309,7 +552,51 @@ Example `proxy.conf.json`:
 }
 ```
 
-The target port must match the backend HTTP port.
+The target port must match the backend HTTP port printed in the backend console.
+
+---
+
+## Frontend Features
+
+### Login
+
+The frontend contains a login page with demo credentials.
+
+After successful login:
+
+- JWT access token is stored in local storage;
+- authenticated user data is stored in local storage;
+- protected routes become available;
+- API requests automatically include the bearer token.
+
+---
+
+### Dashboard
+
+The dashboard shows the main logistics workflow:
+
+- active trips table;
+- debounced search;
+- loading state;
+- error state;
+- refresh action;
+- trip creation form;
+- vehicle availability validation;
+- complete trip action;
+- cancel trip action.
+
+---
+
+### HTTP Interceptors
+
+The frontend includes:
+
+- auth interceptor;
+- global HTTP error interceptor.
+
+The auth interceptor attaches the JWT bearer token to outgoing API requests.
+
+The global error interceptor handles unauthorized responses and redirects to login when needed.
 
 ---
 
@@ -317,9 +604,9 @@ The target port must match the backend HTTP port.
 
 The project includes Docker configuration for:
 
-- PostgreSQL
-- Backend API
-- Angular frontend hosted by Nginx
+- PostgreSQL;
+- backend API;
+- Angular frontend hosted by Nginx.
 
 Run from the root folder:
 
@@ -336,47 +623,54 @@ Expected URLs:
 | Backend Swagger | `http://localhost:8080/swagger` |
 | PostgreSQL | `localhost:5432` |
 
-> **Note:** The backend Docker image uses official Microsoft .NET images from `mcr.microsoft.com`.
-> If Docker cannot pull these images due to network issues, run PostgreSQL through Docker and run the backend locally through Rider.
+> Note: if Docker cannot pull Microsoft .NET images due to network issues, run PostgreSQL through Docker and run the backend locally through Rider or `dotnet run`.
 
 ---
 
-## Frontend Features
+## CI
 
-### Active Trips
+The repository includes GitHub Actions CI.
 
-The `TripListComponent` displays active trips in a Material table.
+The CI pipeline runs on push and pull request to `main`.
 
-It includes:
+Backend job:
 
-- Search input
-- RxJS `debounceTime`
-- Refresh button
-- Loading state
-- Error handling
+```text
+dotnet restore
+dotnet build
+dotnet test
+```
 
-### Create Trip
+Frontend job:
 
-The `CreateTripComponent` contains a reactive form for creating trips.
+```text
+npm ci
+npm run build
+```
 
-It includes:
-
-- Cargo ID
-- Vehicle ID
-- Driver ID
-- Origin
-- Destination
-- Scheduled start
-- Scheduled end
-- Async vehicle availability validation
+This ensures that backend compilation, backend tests and frontend production build are checked automatically.
 
 ---
 
-## HTTP Interceptors
+## Error Handling
 
-The frontend includes:
+The API uses global exception handling and returns consistent HTTP problem responses.
 
-- `AuthInterceptor`
-- `GlobalHttpErrorInterceptor`
+Typical mappings:
 
-The auth interceptor attaches a bearer token when one exists in local storage.
+| Exception | HTTP Status |
+|---|---|
+| `BadRequestException` | `400 Bad Request` |
+| `NotFoundException` | `404 Not Found` |
+| `ConflictException` | `409 Conflict` |
+| Unhandled exception | `500 Internal Server Error` |
+
+Example conflict response:
+
+```json
+{
+  "title": "Conflict",
+  "status": 409,
+  "detail": "Driver is not available."
+}
+```
