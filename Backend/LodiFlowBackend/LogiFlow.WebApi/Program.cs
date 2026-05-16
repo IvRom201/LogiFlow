@@ -5,6 +5,7 @@ using LogiFlow.Infrastructure.Persistence;
 using LogiFlow.WebApi.Endpoints;
 using LogiFlow.WebApi.Middleware;
 using LogiFlow.WebApi.OpenApi;
+using LogiFlow.WebApi.Auth;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -13,7 +14,9 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.Configure<DemoAuthOptions>(builder.Configuration.GetSection("DemoAuth"));
 
+builder.Services.AddScoped<JwtTokenService>();
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("Frontend", policy =>
@@ -62,6 +65,7 @@ app.UseCors("Frontend");
 app.UseAuthentication();
 app.UseAuthorization();
 
+app.MapAuthEndpoints();
 app.MapTripEndpoints();
 app.MapVehicleEndpoints();
 

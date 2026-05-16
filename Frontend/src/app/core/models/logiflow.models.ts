@@ -38,3 +38,22 @@ export interface ApiProblemDetails {
   detail?: string;
   instance?: string;
 }
+
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface LoginResponse {
+  accessToken: string;
+  email: string;
+  fullName: string;
+  role: string;
+  expiresAt: string;
+}
+
+export interface CurrentUserResponse {
+  email: string;
+  fullName: string;
+  role: string;
+}

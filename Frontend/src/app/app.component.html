@@ -1,0 +1,22 @@
+@if (authService.isAuthenticated()) {
+  <mat-toolbar class="app-toolbar">
+    <div class="brand">
+      <mat-icon>local_shipping</mat-icon>
+      <span>LogiFlow</span>
+    </div>
+
+    <span class="toolbar-spacer"></span>
+
+    <div class="user-info">
+      <span class="user-name">{{ authService.displayName() }}</span>
+      <span class="user-role">{{ authService.role() }}</span>
+    </div>
+
+    <button mat-stroked-button type="button" (click)="authService.logout()">
+      <mat-icon>logout</mat-icon>
+      Logout
+    </button>
+  </mat-toolbar>
+}
+
+<router-outlet></router-outlet>

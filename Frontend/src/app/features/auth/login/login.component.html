@@ -1,0 +1,61 @@
+<section class="login-page">
+  <mat-card class="login-card">
+    <mat-card-header>
+      <mat-card-title>LogiFlow</mat-card-title>
+      <mat-card-subtitle>Sign in to manage logistics operations</mat-card-subtitle>
+    </mat-card-header>
+
+    @if (loading()) {
+      <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+    }
+
+    <mat-card-content>
+      <form class="login-form" [formGroup]="form" (ngSubmit)="login()">
+        <mat-form-field appearance="outline">
+          <mat-label>Email</mat-label>
+          <input matInput type="email" formControlName="email" />
+          <mat-icon matSuffix>mail</mat-icon>
+
+          @if (form.controls.email.hasError('required') && form.controls.email.touched) {
+            <mat-error>Email is required.</mat-error>
+          }
+
+          @if (form.controls.email.hasError('email') && form.controls.email.touched) {
+            <mat-error>Enter a valid email.</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Password</mat-label>
+          <input matInput type="password" formControlName="password" />
+          <mat-icon matSuffix>lock</mat-icon>
+
+          @if (form.controls.password.hasError('required') && form.controls.password.touched) {
+            <mat-error>Password is required.</mat-error>
+          }
+        </mat-form-field>
+
+        @if (error()) {
+          <div class="login-error">
+            {{ error() }}
+          </div>
+        }
+
+        <button
+          mat-flat-button
+          color="primary"
+          type="submit"
+          [disabled]="loading()"
+        >
+          Sign in
+        </button>
+      </form>
+
+      <div class="demo-credentials">
+        <strong>Demo credentials</strong>
+        <span>dispatcher&#64;logiflow.local / Dispatcher123!</span>
+        <span>admin&#64;logiflow.local / Admin123!</span>
+      </div>
+    </mat-card-content>
+  </mat-card>
+</section>

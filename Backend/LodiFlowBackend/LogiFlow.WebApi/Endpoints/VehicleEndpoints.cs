@@ -9,7 +9,8 @@ public static class VehicleEndpoints
     public static IEndpointRouteBuilder MapVehicleEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/vehicles")
-            .WithTags("Vehicles");
+            .WithTags("Vehicles")
+            .RequireAuthorization();
 
         group.MapGet("/{id:guid}/availability", async (Guid id, ISender sender, CancellationToken cancellationToken) =>
         {

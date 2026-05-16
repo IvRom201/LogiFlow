@@ -11,7 +11,8 @@ public static class TripEndpoints
     public static IEndpointRouteBuilder MapTripEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/trips")
-            .WithTags("Trips");
+            .WithTags("Trips")
+            .RequireAuthorization();
 
         group.MapGet("/active", async (
             [FromQuery] string? search,
