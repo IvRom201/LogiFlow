@@ -1,16 +1,29 @@
 # LogiFlow
 
+[![CI](https://github.com/IvRom201/LogiFlow/actions/workflows/ci.yml/badge.svg)](https://github.com/IvRom201/LogiFlow/actions/workflows/ci.yml)
+
 LogiFlow is a fullstack logistics management MVP built with **.NET 9**, **Angular 18**, **PostgreSQL**, and **Docker**.
 
-The system allows a dispatcher to sign in, view active logistics trips, create new trips, and manage the trip lifecycle by completing or cancelling active trips.
+The application allows a dispatcher to sign in, view active logistics trips, create new trips, and manage the trip lifecycle by completing or cancelling active trips.
 
-The main backend use case is not a simple CRUD operation. Creating a trip validates and updates several related resources in one transaction:
+The main backend feature is transactional trip creation. Creating a trip is not a simple CRUD operation: the system validates cargo, vehicle, and driver availability, creates the trip, and updates all related statuses consistently in one database transaction.
 
-- cargo must be assignable;
-- vehicle must be idle and have enough capacity;
-- driver must be available;
-- trip is created;
-- cargo, vehicle and driver statuses are updated consistently.
+---
+
+## Features
+
+- Dispatcher login with JWT-based authentication
+- Active trips dashboard
+- Debounced trip search
+- Trip creation form
+- Vehicle availability validation
+- Complete trip action
+- Cancel trip action
+- PostgreSQL persistence
+- EF Core migrations
+- Dockerized backend, frontend, and database
+- Backend unit tests
+- GitHub Actions CI pipeline
 
 ---
 
@@ -82,6 +95,9 @@ LogiFlow/
 │
 ├── docker-compose.yml
 └── README.md
+```
+
+---
 
 ## Architecture
 
@@ -93,11 +109,9 @@ WebApi
 Application
   ↓
 Domain
-```
 
 Infrastructure implements Application abstractions.
-
----
+```
 
 ### Domain Layer
 
@@ -125,8 +139,6 @@ Examples:
 - completed trips cannot be cancelled;
 - cancelled trips cannot be completed.
 
----
-
 ### Application Layer
 
 Contains use cases implemented with MediatR:
@@ -135,6 +147,7 @@ Contains use cases implemented with MediatR:
 - `CompleteTripCommand`
 - `CancelTripCommand`
 - `GetActiveTripsQuery`
+- `CheckVehicleAvailabilityQuery`
 
 It also contains:
 
@@ -143,8 +156,6 @@ It also contains:
 - Unit of Work abstraction;
 - transaction abstraction;
 - application-level exceptions.
-
----
 
 ### Infrastructure Layer
 
@@ -158,8 +169,6 @@ Contains technical implementations:
 - database seeding;
 - transaction implementation.
 
----
-
 ### WebApi Layer
 
 Contains:
@@ -169,17 +178,13 @@ Contains:
 - JWT Bearer authentication;
 - demo authentication endpoints;
 - global exception handling;
-- CORS configuration for Angular frontend.
+- CORS configuration for the Angular frontend.
 
 ---
 
 ## Main Business Flow
 
 ### Creating a Trip
-
-```http
-POST /api/trips
-```
 
 ```text
 POST /api/trips
@@ -199,24 +204,18 @@ Validate cargo / vehicle / driver availability
 Create Trip
         ↓
 Update statuses:
-- cargo -> Assigned
+- cargo   -> Assigned
 - vehicle -> Busy
-- driver -> OnTrip
+- driver  -> OnTrip
         ↓
 SaveChanges
         ↓
 Commit transaction
 ```
 
-This prevents assigning the same vehicle, driver or cargo to multiple trips at the same time.
-
----
+This prevents assigning the same cargo, vehicle, or driver to multiple active trips at the same time.
 
 ### Completing a Trip
-
-```http
-PUT /api/trips/{id}/complete
-```
 
 ```text
 PUT /api/trips/{id}/complete
@@ -226,19 +225,13 @@ CompleteTripCommand
 CompleteTripCommandHandler
         ↓
 Update statuses:
-- trip -> Completed
-- cargo -> Delivered
+- trip    -> Completed
+- cargo   -> Delivered
 - vehicle -> Idle
-- driver -> Available
+- driver  -> Available
 ```
-
----
 
 ### Cancelling a Trip
-
-```http
-PUT /api/trips/{id}/cancel
-```
 
 ```text
 PUT /api/trips/{id}/cancel
@@ -248,10 +241,10 @@ CancelTripCommand
 CancelTripCommandHandler
         ↓
 Update statuses:
-- trip -> Cancelled
-- cargo -> Cancelled
+- trip    -> Cancelled
+- cargo   -> Cancelled
 - vehicle -> Idle
-- driver -> Available
+- driver  -> Available
 ```
 
 ---
@@ -260,11 +253,9 @@ Update statuses:
 
 Most business endpoints require JWT authentication.
 
----
+### Auth
 
-## Auth
-
-### Login
+#### Login
 
 ```http
 POST /api/auth/login
@@ -291,9 +282,7 @@ Example response:
 }
 ```
 
----
-
-### Get Current User
+#### Get Current User
 
 ```http
 GET /api/auth/me
@@ -303,29 +292,25 @@ Requires authorization.
 
 ---
 
-## Trips
+### Trips
 
 All trip endpoints require authorization.
 
----
-
-### Get Active Trips
+#### Get Active Trips
 
 ```http
 GET /api/trips/active
 ```
 
-Optional query parameter:
+Optional search parameter:
 
 ```http
 GET /api/trips/active?search=warsaw
 ```
 
-Returns active trips. Search can match route, cargo, vehicle or driver data.
+Returns active trips. Search can match route, cargo, vehicle, or driver data.
 
----
-
-### Create Trip
+#### Create Trip
 
 ```http
 POST /api/trips
@@ -347,14 +332,14 @@ Example request:
 
 Possible responses:
 
-- `201 Created`
-- `400 Bad Request`
-- `404 Not Found`
-- `409 Conflict`
+| Status | Description |
+|---|---|
+| `201 Created` | Trip was created successfully |
+| `400 Bad Request` | Invalid input data |
+| `404 Not Found` | Cargo, vehicle, or driver was not found |
+| `409 Conflict` | Cargo, vehicle, or driver is not available |
 
----
-
-### Complete Trip
+#### Complete Trip
 
 ```http
 PUT /api/trips/{id}/complete
@@ -364,13 +349,13 @@ Completes an active trip and releases assigned resources.
 
 Possible responses:
 
-- `200 OK`
-- `404 Not Found`
-- `409 Conflict`
+| Status | Description |
+|---|---|
+| `200 OK` | Trip was completed successfully |
+| `404 Not Found` | Trip was not found |
+| `409 Conflict` | Trip cannot be completed in its current state |
 
----
-
-### Cancel Trip
+#### Cancel Trip
 
 ```http
 PUT /api/trips/{id}/cancel
@@ -380,19 +365,19 @@ Cancels an active trip and releases assigned resources.
 
 Possible responses:
 
-- `200 OK`
-- `404 Not Found`
-- `409 Conflict`
+| Status | Description |
+|---|---|
+| `200 OK` | Trip was cancelled successfully |
+| `404 Not Found` | Trip was not found |
+| `409 Conflict` | Trip cannot be cancelled in its current state |
 
 ---
 
-## Vehicles
+### Vehicles
 
 Vehicle endpoints require authorization.
 
----
-
-### Check Vehicle Availability
+#### Check Vehicle Availability
 
 ```http
 GET /api/vehicles/{id}/availability
@@ -406,14 +391,15 @@ Checks whether a vehicle is currently available.
 
 The project uses a simple demo authentication flow.
 
-Demo users are configured through application settings:
+Demo users:
 
-```text
-dispatcher@logiflow.local / Dispatcher123!
-admin@logiflow.local / Admin123!
-```
+| Role | Email | Password |
+|---|---|---|
+| Dispatcher | `dispatcher@logiflow.local` | `Dispatcher123!` |
+| Admin | `admin@logiflow.local` | `Admin123!` |
 
-This is intentionally lightweight and suitable for a portfolio MVP. It is not a production identity system. A production version should use hashed passwords, persistent users, refresh tokens and stricter secret management.
+This is intentionally lightweight and suitable for a portfolio MVP.  
+A production version should use hashed passwords, persistent users, refresh tokens, and stricter secret management.
 
 ---
 
@@ -429,16 +415,23 @@ This is intentionally lightweight and suitable for a portfolio MVP. It is not a 
 
 ---
 
-## Run PostgreSQL
+## Run with Docker
 
-From the root folder:
+From the repository root:
 
-```powershell
-cd C:\Studies\Pet_projects\LogiFlow
-docker compose up -d postgres
+```bash
+docker compose up --build
 ```
 
-PostgreSQL connection:
+Expected URLs:
+
+| Service | URL |
+|---|---|
+| Frontend | `http://localhost:4200` |
+| Backend Swagger | `http://localhost:8080/swagger` |
+| PostgreSQL | `localhost:5432` |
+
+PostgreSQL credentials:
 
 | Property | Value |
 |---|---|
@@ -447,6 +440,16 @@ PostgreSQL connection:
 | Database | `logiflow` |
 | Username | `postgres` |
 | Password | `postgres` |
+
+---
+
+## Run PostgreSQL Only
+
+If you want to run the backend locally through Rider, Visual Studio, or `dotnet run`, start only PostgreSQL first:
+
+```bash
+docker compose up -d postgres
+```
 
 ---
 
@@ -460,8 +463,8 @@ Backend/LodiFlowBackend/LodiFlowBackend.sln
 
 Or run from terminal:
 
-```powershell
-cd C:\Studies\Pet_projects\LogiFlow\Backend\LodiFlowBackend
+```bash
+cd Backend/LodiFlowBackend
 dotnet run --project LogiFlow.WebApi
 ```
 
@@ -471,7 +474,7 @@ Swagger will be available at the URL printed in the console, for example:
 http://localhost:5081/swagger
 ```
 
-Before starting the backend, PostgreSQL must be running because the application applies migrations on startup.
+Before starting the backend, PostgreSQL must be running because the application applies pending migrations on startup.
 
 ---
 
@@ -479,23 +482,16 @@ Before starting the backend, PostgreSQL must be running because the application 
 
 Create a new migration:
 
-```powershell
-cd C:\Studies\Pet_projects\LogiFlow\Backend\LodiFlowBackend
+```bash
+cd Backend/LodiFlowBackend
 
-dotnet ef migrations add MigrationName `
-  --project LogiFlow.Infrastructure `
-  --startup-project LogiFlow.WebApi `
-  --context AppDbContext `
-  --output-dir Persistence\Migrations
+dotnet ef migrations add MigrationName --project LogiFlow.Infrastructure --startup-project LogiFlow.WebApi --context AppDbContext --output-dir Persistence/Migrations
 ```
 
 Apply migrations manually:
 
-```powershell
-dotnet ef database update `
-  --project LogiFlow.Infrastructure `
-  --startup-project LogiFlow.WebApi `
-  --context AppDbContext
+```bash
+dotnet ef database update --project LogiFlow.Infrastructure --startup-project LogiFlow.WebApi --context AppDbContext
 ```
 
 The application also applies pending migrations automatically on startup.
@@ -506,8 +502,8 @@ The application also applies pending migrations automatically on startup.
 
 From the backend solution folder:
 
-```powershell
-cd C:\Studies\Pet_projects\LogiFlow\Backend\LodiFlowBackend
+```bash
+cd Backend/LodiFlowBackend
 dotnet test
 ```
 
@@ -526,8 +522,8 @@ The backend test projects cover:
 
 From the frontend folder:
 
-```powershell
-cd C:\Studies\Pet_projects\LogiFlow\Frontend
+```bash
+cd Frontend
 npm install
 npm start
 ```
@@ -569,8 +565,6 @@ After successful login:
 - protected routes become available;
 - API requests automatically include the bearer token.
 
----
-
 ### Dashboard
 
 The dashboard shows the main logistics workflow:
@@ -585,8 +579,6 @@ The dashboard shows the main logistics workflow:
 - complete trip action;
 - cancel trip action.
 
----
-
 ### HTTP Interceptors
 
 The frontend includes:
@@ -597,58 +589,6 @@ The frontend includes:
 The auth interceptor attaches the JWT bearer token to outgoing API requests.
 
 The global error interceptor handles unauthorized responses and redirects to login when needed.
-
----
-
-## Docker
-
-The project includes Docker configuration for:
-
-- PostgreSQL;
-- backend API;
-- Angular frontend hosted by Nginx.
-
-Run from the root folder:
-
-```powershell
-cd C:\Studies\Pet_projects\LogiFlow
-docker compose up --build
-```
-
-Expected URLs:
-
-| Service | URL |
-|---|---|
-| Frontend | `http://localhost:4200` |
-| Backend Swagger | `http://localhost:8080/swagger` |
-| PostgreSQL | `localhost:5432` |
-
-> Note: if Docker cannot pull Microsoft .NET images due to network issues, run PostgreSQL through Docker and run the backend locally through Rider or `dotnet run`.
-
----
-
-## CI
-
-The repository includes GitHub Actions CI.
-
-The CI pipeline runs on push and pull request to `main`.
-
-Backend job:
-
-```text
-dotnet restore
-dotnet build
-dotnet test
-```
-
-Frontend job:
-
-```text
-npm ci
-npm run build
-```
-
-This ensures that backend compilation, backend tests and frontend production build are checked automatically.
 
 ---
 
@@ -674,3 +614,44 @@ Example conflict response:
   "detail": "Driver is not available."
 }
 ```
+
+---
+
+## CI
+
+The repository includes GitHub Actions CI.
+
+The CI pipeline runs on push and pull request to `main`.
+
+Backend job:
+
+```bash
+dotnet restore
+dotnet build
+dotnet test
+```
+
+Frontend job:
+
+```bash
+npm ci
+npm run build
+```
+
+This ensures that backend compilation, backend tests, and frontend production build are checked automatically.
+
+---
+
+## Notes
+
+This is a portfolio MVP, not a production logistics platform.
+
+Production improvements could include:
+
+- persistent user management with ASP.NET Core Identity;
+- password hashing and refresh tokens;
+- role-based authorization policies;
+- richer trip planning logic;
+- integration tests with Testcontainers;
+- frontend end-to-end tests;
+- deployment configuration for cloud hosting.
